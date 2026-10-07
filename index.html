@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Guante traductor de señas</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef1f4;--card:#fff;--ink:#14202b;--mut:#5b6b79;--line:#cfd7de;--acc:#2457d6;--ok:#1a7f4b;--bad:#b3261e}
+@media(prefers-color-scheme:dark){:root{--bg:#121a22;--card:#1b2630;--ink:#e8eef3;--mut:#93a4b2;--line:#2c3a47;--acc:#7aa2ff;--ok:#5fd394;--bad:#ff8a80}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Atkinson Hyperlegible",system-ui,sans-serif}
+main{max-width:980px;margin:0 auto;padding:20px 16px 48px;display:grid;gap:16px}
+h1{font-size:1.7rem;margin:0}h2{font-size:1.05rem;margin:0 0 10px}
+p.sub{margin:4px 0 0;color:var(--mut)}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
+.grid{display:grid;gap:16px;grid-template-columns:1fr 1fr}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button.p{background:var(--acc);border-color:var(--acc);color:#fff}
+button:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.dedos{display:grid;gap:10px}
+.dedo{display:grid;grid-template-columns:70px 1fr 90px;gap:10px;align-items:center}
+.barra{height:14px;background:var(--bg);border-radius:7px;overflow:hidden;border:1px solid var(--line)}
+.barra i{display:block;height:100%;width:0;background:var(--acc)}
+.num{font-variant-numeric:tabular-nums;color:var(--mut);text-align:right;font-size:.9rem}
+input[type=range]{width:100%}
+input[type=text]{font:inherit;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+#estado{font-weight:700}#estado.on{color:var(--ok)}
+#texto{min-height:3.2em;font-size:2rem;font-weight:700;word-break:break-word}
+#actual{font-size:1.1rem;color:var(--mut)}
+ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+li{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+li small{color:var(--mut)}
+pre{background:var(--bg);padding:12px;border-radius:8px;overflow:auto;font-size:.85rem}
+.simdedo{display:grid;grid-template-columns:70px 1fr;gap:10px;align-items:center}
+:root{--g1:#34475b;--g2:#4a6480}
+@media(prefers-color-scheme:dark){:root{--g1:#5a7690;--g2:#7592ad}}
+.vivo{display:grid;grid-template-columns:minmax(240px,320px) 1fr;gap:20px;align-items:center}
+@media(max-width:760px){.vivo{grid-template-columns:1fr}}
+.burbuja{background:var(--acc);color:var(--bg);padding:6px 16px;border-radius:16px;font-weight:700;font-size:1.6rem;text-align:center;min-height:2.6rem;margin-bottom:8px}
+#svgm svg{width:100%;max-width:320px;display:block;margin:0 auto}
+.palma{fill:var(--g1);stroke:rgba(0,0,0,.35);stroke-width:1.5}
+.dedo{fill:var(--g2);stroke:rgba(0,0,0,.35);stroke-width:1.5}
+.art{stroke:rgba(255,255,255,.3);stroke-width:2;stroke-linecap:round}
+.puno{fill:var(--acc)}
+.chip{padding:4px 12px;border-radius:16px}
+</style>
+</head>
+<body>
+<main>
+<header>
+<h1>Guante traductor de señas</h1>
+<p class="sub">Conecta el guante por USB, calibra los dedos, graba tus señas y escucha la traducción.</p>
+</header>
+
+<section>
+<h2>Guante en vivo</h2>
+<div class="vivo">
+<div><div id="burbuja" class="burbuja" aria-live="polite">…</div><div id="svgm"></div></div>
+<div>
+<p class="sub" style="margin-top:0">La mano se mueve con las lecturas del guante. Si aún no lo conectas, reproduce la demo para ver cómo diría las señas.</p>
+<div class="row" style="margin-top:10px"><button class="p" id="btnDemo">▶ Demo: hola, bien, sí, gracias, te quiero</button></div>
+<div class="row" id="chips" style="margin-top:10px"></div>
+<div class="row" style="margin-top:10px"><button id="btnBasicas">Cargar señas básicas al guante</button></div>
+<p class="sub">Son posturas de dedos simplificadas para probar el sistema; ajústalas a la seña que uses (LSM, ASL, etc.) grabándolas tú mismo en el paso 3.</p>
+</div>
+</div>
+</section>
+
+<section>
+<h2>1. Conexión</h2>
+<div class="row">
+<button class="p" id="btnCon">Conectar guante (USB)</button>
+<span id="estado">Desconectado</span>
+</div>
+<p class="sub">Requiere Chrome o Edge. El guante debe enviar por serial (115200 baudios) una línea por lectura: <code>d1,d2,d3,d4,d5</code> (pulgar a meñique).</p>
+<details style="margin-top:10px"><summary>Sin guante: usar simulador</summary>
+<div id="sim" class="dedos" style="margin-top:10px"></div>
+</details>
+</section>
+
+<div class="grid">
+<section>
+<h2>2. Calibración</h2>
+<div id="dedos" class="dedos"></div>
+<div class="row" style="margin-top:12px">
+<button id="btnAbierta">Guardar mano abierta</button>
+<button id="btnPuno">Guardar puño cerrado</button>
+</div>
+</section>
+
+<section>
+<h2>3. Grabar señas</h2>
+<div class="row">
+<input type="text" id="nombre" placeholder="Letra o palabra (ej. A, Hola)" maxlength="20" aria-label="Nombre de la seña">
+<button class="p" id="btnGrabar">Grabar postura actual</button>
+</div>
+<p class="sub">Forma la seña con la mano y pulsa grabar. Graba cada seña 2 o 3 veces para mayor precisión.</p>
+<ul id="lista" style="margin-top:10px"></ul>
+</section>
+</div>
+
+<section>
+<h2>4. Traducción</h2>
+<div id="actual">Esperando seña…</div>
+<div id="texto" aria-live="polite"></div>
+<div class="row" style="margin-top:10px">
+<button class="p" id="btnHablar">Leer en voz alta</button>
+<button id="btnEspacio">Espacio</button>
+<button id="btnBorrar">Borrar</button>
+<label class="row">Voz automática <input type="checkbox" id="auto" checked></label>
+</div>
+<div class="row" style="margin-top:12px">
+<label for="umbral">Tolerancia</label>
+<input type="range" id="umbral" min="0.05" max="0.6" step="0.01" value="0.25" style="max-width:200px">
+<span class="num" id="umbralV">0.25</span>
+<label for="estab">Estabilidad (lecturas)</label>
+<input type="range" id="estab" min="3" max="30" step="1" value="10" style="max-width:160px">
+<span class="num" id="estabV">10</span>
+</div>
+</section>
+
+<section>
+<h2>Código Arduino / ESP32 de referencia</h2>
+<pre>// 5 sensores flex en pines analógicos (ajusta a tu placa)
+const int pines[5] = {A0, A1, A2, A3, A4};
+void setup() { Serial.begin(115200); }
+void loop() {
+  for (int i = 0; i &lt; 5; i++) {
+    Serial.print(analogRead(pines[i]));
+    if (i &lt; 4) Serial.print(',');
+  }
+  Serial.println();
+  delay(30);
+}</pre>
+</section>
+</main>
+
+<script>
+const NOMBRES=["Pulgar","Índice","Medio","Anular","Meñique"];
+let raw=[0,0,0,0,0],abierta=[0,0,0,0,0],cerrado=[1023,1023,1023,1023,1023];
+let muestras=[],ultimo=null,estable=0,emitido=null,texto="";
+const $=id=>document.getElementById(id);
+
+try{const g=JSON.parse(localStorage.getItem("guante_senas")||"null");
+ if(g){muestras=g.m||[];abierta=g.a||abierta;cerrado=g.c||cerrado}}catch(e){}
+function guardar(){try{localStorage.setItem("guante_senas",JSON.stringify({m:muestras,a:abierta,c:cerrado}))}catch(e){}}
+
+// Interfaz de dedos y simulador
+NOMBRES.forEach((n,i)=>{
+ $("dedos").insertAdjacentHTML("beforeend",`<div class="dedo"><span>${n}</span><div class="barra"><i id="b${i}"></i></div><span class="num" id="v${i}">0</span></div>`);
+ $("sim").insertAdjacentHTML("beforeend",`<div class="simdedo"><span>${n}</span><input type="range" min="0" max="1023" value="0" data-i="${i}" aria-label="${n}"></div>`);
+});
+document.querySelectorAll("#sim input").forEach(s=>s.oninput=()=>{
+ const v=[...document.querySelectorAll("#sim input")].map(x=>+x.value);actualizar(v)});
+
+const norm=()=>raw.map((v,i)=>{const d=(cerrado[i]-abierta[i])||1;return Math.min(1,Math.max(0,(v-abierta[i])/d))});
+
+function actualizar(v){
+ raw=v;const n=norm();
+ if(!demo)dibujar(n);
+ n.forEach((x,i)=>{$("b"+i).style.width=(x*100)+"%";$("v"+i).textContent=v[i]});
+ reconocer(n);
+}
+
+function reconocer(n){
+ let mejor=null,dmin=1e9;
+ for(const m of muestras){
+  const d=Math.sqrt(m.v.reduce((s,x,i)=>s+(x-n[i])**2,0)/5);
+  if(d<dmin){dmin=d;mejor=m.n}
+ }
+ const cand=(mejor&&dmin<=+$("umbral").value)?mejor:null;
+ $("actual").textContent=cand?`Detectando: ${cand}`:"Esperando seña…";
+ if(cand!==ultimo){ultimo=cand;estable=0}
+ estable++;
+ if(!cand){emitido=null;return}
+ if(estable>=+$("estab").value&&cand!==emitido){
+  emitido=cand;
+  texto+=(cand.length>1&&texto&&!texto.endsWith(" ")?" ":"")+cand+(cand.length>1?" ":"");
+  $("texto").textContent=texto;
+  if($("auto").checked)hablar(cand);
+ }
+}
+
+function hablar(t){
+ if(!("speechSynthesis" in window))return;
+ const u=new SpeechSynthesisUtterance(t);u.lang="es-MX";
+ speechSynthesis.cancel();speechSynthesis.speak(u);
+}
+
+function pintarLista(){
+ const ul=$("lista");ul.innerHTML="";
+ if(!muestras.length){ul.innerHTML="<li><small>Aún no hay señas grabadas.</small></li>";return}
+ muestras.forEach((m,i)=>{
+  const li=document.createElement("li");
+  li.innerHTML=`<span><b></b> <small>muestra ${i+1}</small></span>`;
+  li.querySelector("b").textContent=m.n;
+  const b=document.createElement("button");b.textContent="Eliminar";
+  b.onclick=()=>{muestras.splice(i,1);guardar();pintarLista()};
+  li.appendChild(b);ul.appendChild(li);
+ });
+}
+
+// Botones
+$("btnAbierta").onclick=()=>{abierta=[...raw];guardar()};
+$("btnPuno").onclick=()=>{cerrado=[...raw];guardar()};
+$("btnGrabar").onclick=()=>{
+ const n=$("nombre").value.trim();
+ if(!n){$("nombre").focus();return}
+ muestras.push({n,v:norm()});guardar();pintarLista();
+};
+$("btnHablar").onclick=()=>hablar(texto||"Sin texto");
+$("btnEspacio").onclick=()=>{texto+=" ";$("texto").textContent=texto};
+$("btnBorrar").onclick=()=>{texto="";emitido=null;$("texto").textContent=""};
+$("umbral").oninput=e=>$("umbralV").textContent=e.target.value;
+$("estab").oninput=e=>$("estabV").textContent=e.target.value;
+
+// Conexión serial
+$("btnCon").onclick=async()=>{
+ if(!("serial" in navigator)){alert("Tu navegador no soporta Web Serial. Usa Chrome o Edge en una computadora.");return}
+ try{
+  const port=await navigator.serial.requestPort();
+  await port.open({baudRate:115200});
+  $("estado").textContent="Conectado";$("estado").className="on";
+  const dec=new TextDecoderStream();port.readable.pipeTo(dec.writable);
+  const reader=dec.readable.getReader();let buf="";
+  while(true){
+   const {value,done}=await reader.read();if(done)break;
+   buf+=value;let k;
+   while((k=buf.indexOf("\n"))>=0){
+    const p=buf.slice(0,k).trim().split(",").map(Number);buf=buf.slice(k+1);
+    if(p.length>=5&&p.slice(0,5).every(x=>!isNaN(x)))actualizar(p.slice(0,5));
+   }
+  }
+ }catch(e){$("estado").textContent="Error: "+e.message;$("estado").className=""}
+};
+// ===== Mano visual y demo =====
+let demo=false,curl=[0,0,0,0,0],obj=[0,0,0,0,0],gesto="";
+const XS=[88,126,164,202],LG=[88,98,88,70];
+const SENAS={"Hola":[0,0,0,0,0],"Bien":[0,1,1,1,1],"Sí":[1,1,1,1,1],"Gracias":[.7,0,0,0,0],"Te quiero":[0,0,1,1,0],"No":[1,0,0,1,1],"Agua":[1,0,0,0,1]};
+let s='<svg viewBox="0 0 320 380" role="img" aria-label="Guante animado"><g id="gm"><rect class="puno" x="94" y="310" width="132" height="62" rx="10"/><rect class="palma" x="80" y="170" width="160" height="150" rx="32"/>';
+for(let i=1;i<5;i++)s+=`<g id="f${i}"><rect id="fr${i}" class="dedo" x="${XS[i-1]}" y="100" width="30" height="96" rx="15"/><line id="fa${i}" class="art" x1="${XS[i-1]+6}" x2="${XS[i-1]+24}"/><line id="fb${i}" class="art" x1="${XS[i-1]+6}" x2="${XS[i-1]+24}"/></g>`;
+s+='<g id="f0"><rect class="dedo" x="-16" y="-68" width="32" height="76" rx="16"/></g></g></svg>';
+$("svgm").innerHTML=s;
+
+function dibujar(c,r=0,dy=0){
+ $("gm").setAttribute("transform",`translate(0 ${dy}) rotate(${r} 160 340)`);
+ c.forEach((v,i)=>{
+  const g=$("f"+i);g.style.filter=`brightness(${1-.25*v})`;
+  if(i===0){g.setAttribute("transform",`translate(86 285) rotate(${-48+78*v})`);return}
+  const h=LG[i-1]*(1-.78*v)+14,top=196-h;
+  $("fr"+i).setAttribute("y",top);$("fr"+i).setAttribute("height",h);
+  $("fa"+i).setAttribute("y1",top+h*.35);$("fa"+i).setAttribute("y2",top+h*.35);
+  $("fb"+i).setAttribute("y1",top+h*.68);$("fb"+i).setAttribute("y2",top+h*.68);
+ });
+}
+function bucle(t){
+ for(let i=0;i<5;i++)curl[i]+=(obj[i]-curl[i])*.16;
+ let r=0,dy=0;
+ if(gesto==="Hola")r=Math.sin(t/110)*14;
+ if(gesto==="No")r=Math.sin(t/90)*10;
+ if(gesto==="Sí")dy=Math.abs(Math.sin(t/140))*14;
+ dibujar(curl,r,dy);
+ if(demo)requestAnimationFrame(bucle);
+}
+const dormir=ms=>new Promise(r=>setTimeout(r,ms));
+async function decir(n){
+ gesto=n;obj=SENAS[n];$("burbuja").textContent=n;
+ texto+=(texto?" ":"")+n;$("texto").textContent=texto;
+ hablar(n);await dormir(1700);
+}
+async function reproducir(seq){
+ if(demo)return;demo=true;requestAnimationFrame(bucle);
+ for(const n of seq)await decir(n);
+ gesto="";obj=[0,0,0,0,0];await dormir(800);
+ demo=false;$("burbuja").textContent="…";dibujar(norm());
+}
+Object.keys(SENAS).forEach(n=>{
+ const b=document.createElement("button");b.className="chip";b.textContent=n;
+ b.onclick=()=>reproducir([n]);$("chips").appendChild(b);
+});
+$("btnDemo").onclick=()=>reproducir(["Hola","Bien","Sí","Gracias","Te quiero"]);
+$("btnBasicas").onclick=()=>{
+ muestras=muestras.filter(m=>!(m.n in SENAS));
+ for(const n in SENAS)muestras.push({n,v:[...SENAS[n]]});
+ guardar();pintarLista();$("burbuja").textContent="Señas cargadas";
+};
+dibujar(norm());
+pintarLista();
+</script>
+</body>
+</html>
